@@ -2,13 +2,13 @@ import { ICalculatedMilestone } from './calculated-output';
 
 export interface IValidatedMilestone extends ICalculatedMilestone {
   isValid: boolean;
-  errors: string[]; // List of specific error messages for this row
-  errorFields: string[]; // List of specific keys that failed (e.g., ['startCuttingActual', 'masterPo'])
+  errors: string[];
+  errorFields: string[];
 }
 
-export const mockData: IValidatedMilestone[] =[
+export const mockData: IValidatedMilestone[] = [
   {
-    masterPo: "", // Intentional error: Missing Master PO
+    masterPo: "PO-2026-001",
     lineNo: "1",
     masterStyle: "QF8594",
     colorCode: "100",
@@ -17,7 +17,7 @@ export const mockData: IValidatedMilestone[] =[
     criticalMaterialActual: "2026-02-09T00:00:00Z",
     preProductionSampleReady: "2026-02-13T00:00:00Z",
     startCuttingExpected: "2026-02-15T00:00:00Z",
-    startCuttingActual: "2027-02-16T00:00:00Z", // Intentional error: Future date mismatch
+    startCuttingActual: "2026-02-16T00:00:00Z",
     startSewExpected: "2026-02-24T00:00:00Z",
     startSewActual: "2026-02-20T00:00:00Z",
     startPackingExpected: "2026-02-25T00:00:00Z",
@@ -29,13 +29,8 @@ export const mockData: IValidatedMilestone[] =[
     reasonForDelay1: null,
     reasonForDelay2: null,
     comments: null,
-    
-    // Validation Metadata added by Dahami's Engine
-    isValid: false,
-    errors:[
-      "Master PO - Cannot be empty",
-      "Start Cutting Actual - Cannot be a future date"
-    ],
-    errorFields: ["masterPo", "startCuttingActual"]
+    isValid: true,
+    errors: [],
+    errorFields: []
   }
 ];
