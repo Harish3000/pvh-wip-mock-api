@@ -94,13 +94,12 @@ async function build() {
       </div>`;
   }
 
-  // 3. Generate the UI (Tailwind CSS)
+  // 3. Generate the UI (Tailwind CSS) - Removed Producer/Consumer column
   let rolesHTML = planData.roles.map((r: any) => `
     <tr class="border-b border-slate-100 hover:bg-slate-50 transition-colors">
       <td class="p-4 font-semibold text-slate-900">${r.dev}</td>
       <td class="p-4 text-slate-600">${r.role}</td>
       <td class="p-4"><span class="px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-md text-xs font-mono text-slate-700">${r.contract}.ts</span></td>
-      <td class="p-4"><span class="px-2.5 py-1 rounded-md text-xs font-bold tracking-wide ${r.type === 'Producer' ? 'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/20' : 'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20'}">${r.type}</span></td>
     </tr>`).join('');
 
   const html = `
@@ -118,7 +117,7 @@ async function build() {
       <script>
         tailwind.config = {
           theme: {
-            extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } }
+            extend: { fontFamily: { sans:['Inter', 'sans-serif'] } }
           }
         }
       </script>
@@ -184,7 +183,6 @@ async function build() {
                       <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Developer</th>
                       <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Domain</th>
                       <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Contract</th>
-                      <th class="p-4 text-xs font-bold text-slate-500 uppercase tracking-wider">Role</th>
                     </tr>
                   </thead>
                   <tbody>${rolesHTML}</tbody>
