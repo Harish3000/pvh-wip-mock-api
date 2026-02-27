@@ -1,8 +1,20 @@
 import * as fs from 'fs-extra';
 import * as path from 'path';
+import { execSync } from 'child_process';
 
 const srcDir = path.join(__dirname, 'src', 'contracts');
 const outDir = path.join(__dirname, 'public');
+
+// Helper to get true file modified time from Git (Fallback to fs.stat)
+function getTrueFileTime(filePath: string): Date {
+  try {
+    const gitTime = execSync(`git log -1 --format="%cd" --date=iso -- "${filePath}"`, { stdio: 'pipe' }).toString().trim();
+    if (gitTime) return new Date(gitTime);
+  } catch (e) {
+    // Git not available or file not committed yet, fallback to FS time
+  }
+  return fs.statSync(filePath).mtime;
+}
 
 async function build() {
   await fs.emptyDir(outDir);
@@ -14,13 +26,13 @@ async function build() {
 
   let contracts =[];
 
-  // 2. Read and Sort Contracts by Last Modified Date
+  // 2. Read and Sort Contracts by True Last Modified Date
   if (await fs.pathExists(srcDir)) {
     const files = await fs.readdir(srcDir);
     for (const file of files) {
       if (file.endsWith('.ts')) {
         const filePath = path.join(srcDir, file);
-        const stats = await fs.stat(filePath);
+        const trueTime = getTrueFileTime(filePath);
         const baseName = file.replace('.ts', '');
         const module = require(filePath);
         
@@ -29,11 +41,11 @@ async function build() {
             file,
             baseName,
             data: module.mockData,
-            mtime: stats.mtime,
-            updatedStr: stats.mtime.toLocaleString('en-US', { timeZone: 'Asia/Colombo', dateStyle: 'medium', timeStyle: 'short' })
+            mtime: trueTime,
+            updatedStr: trueTime.toLocaleString('en-US', { timeZone: 'Asia/Colombo', dateStyle: 'medium', timeStyle: 'short' })
           });
         }
-        // Copy raw TS file for viewing
+        // Copy raw TS file so it can be fetched by the browser
         await fs.copy(filePath, path.join(outDir, 'contracts', file));
       }
     }
@@ -57,7 +69,7 @@ async function build() {
               <h3 class="text-lg font-bold text-slate-900 truncate">${c.baseName}</h3>
               <span class="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 border border-slate-200 whitespace-nowrap">
                 <svg class="mr-1.5 h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>
-                ${c.updatedStr}
+                Updated: ${c.updatedStr}
               </span>
             </div>
             <p class="text-sm text-slate-500 flex items-center gap-1.5 truncate">
@@ -66,14 +78,16 @@ async function build() {
             </p>
           </div>
           <!-- Buttons Section -->
-          <div class="flex flex-row items-center gap-2 w-full lg:w-auto shrink-0 mt-2 lg:mt-0">
-            <button onclick="copyUrl('/contracts/${c.file}')" class="flex-1 lg:flex-none inline-flex justify-center items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 transition-all">
-              <svg class="h-4 w-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path></svg>
-              Copy TS
+          <div class="flex flex-row items-center gap-3 w-full lg:w-auto shrink-0 mt-2 lg:mt-0">
+            <!-- Copies the Actual TypeScript Code -->
+            <button onclick="copyContractCode('/contracts/${c.file}', '${c.file}')" class="flex-1 lg:flex-none inline-flex justify-center items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm ring-1 ring-inset ring-slate-300 hover:bg-slate-50 transition-all">
+              <svg class="h-4 w-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg>
+              Copy Contract
             </button>
-            <button onclick="copyUrl('/${c.baseName}.json')" class="flex-1 lg:flex-none inline-flex justify-center items-center gap-2 rounded-lg bg-indigo-50 px-4 py-2 text-sm font-semibold text-indigo-700 shadow-sm ring-1 ring-inset ring-indigo-200 hover:bg-indigo-100 transition-all">
-              <svg class="h-4 w-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
-              Copy JSON
+            <!-- Copies the JSON API URL -->
+            <button onclick="copyApiUrl('/${c.baseName}.json', '${c.baseName}.json')" class="flex-1 lg:flex-none inline-flex justify-center items-center gap-2 rounded-lg bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700 shadow-sm ring-1 ring-inset ring-emerald-200 hover:bg-emerald-100 transition-all">
+              <svg class="h-4 w-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"></path></svg>
+              Copy URL
             </button>
           </div>
         </div>
@@ -86,7 +100,7 @@ async function build() {
       <td class="p-4 font-semibold text-slate-900">${r.dev}</td>
       <td class="p-4 text-slate-600">${r.role}</td>
       <td class="p-4"><span class="px-2.5 py-1 bg-slate-100 border border-slate-200 rounded-md text-xs font-mono text-slate-700">${r.contract}.ts</span></td>
-      <td class="p-4"><span class="px-2.5 py-1 rounded-md text-xs font-bold tracking-wide ${r.type === 'Producer' ? 'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/20' : 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20'}">${r.type}</span></td>
+      <td class="p-4"><span class="px-2.5 py-1 rounded-md text-xs font-bold tracking-wide ${r.type === 'Producer' ? 'bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/20' : 'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-600/20'}">${r.type}</span></td>
     </tr>`).join('');
 
   const html = `
@@ -104,9 +118,7 @@ async function build() {
       <script>
         tailwind.config = {
           theme: {
-            extend: {
-              fontFamily: { sans: ['Inter', 'sans-serif'] },
-            }
+            extend: { fontFamily: { sans: ['Inter', 'sans-serif'] } }
           }
         }
       </script>
@@ -116,10 +128,12 @@ async function build() {
       <!-- Toast Notification -->
       <div id="toast" class="fixed bottom-5 right-5 transform translate-y-20 opacity-0 transition-all duration-300 bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl flex items-center z-50 border border-slate-700">
         <svg class="w-5 h-5 mr-3 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
-        <span id="toast-msg" class="font-medium text-sm">Copied to clipboard!</span>
+        <span id="toast-msg" class="font-medium text-sm">Copied!</span>
       </div>
 
-      <div class="max-w-7xl mx-auto">
+      <div class="max-w-5xl mx-auto">
+        
+        <!-- Header -->
         <header class="mb-10 flex flex-col md:flex-row justify-between items-start md:items-center border-b border-slate-200 pb-6">
           <div class="flex items-center gap-4">
             <div class="p-3 bg-indigo-600 rounded-xl shadow-lg shadow-indigo-200">
@@ -141,10 +155,11 @@ async function build() {
           </div>
         </header>
 
-        <div class="grid grid-cols-1 xl:grid-cols-12 gap-10">
+        <!-- Main Content Stack -->
+        <div class="flex flex-col gap-10">
           
-          <!-- Left Column: API Endpoints -->
-          <section class="xl:col-span-7">
+          <!-- Top Section: Contracts -->
+          <section>
             <div class="flex flex-col sm:flex-row justify-between items-start sm:items-end mb-6 gap-2">
               <h2 class="text-xl font-bold text-slate-900 flex items-center tracking-tight">
                 <svg class="w-5 h-5 mr-2.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
@@ -152,13 +167,13 @@ async function build() {
               </h2>
               <span class="text-[11px] font-bold text-slate-400 uppercase tracking-widest bg-slate-100 px-2.5 py-1 rounded-md">Sorted by Newest</span>
             </div>
-            ${contractLinksHTML || '<div class="bg-white p-10 rounded-2xl border-2 border-dashed border-slate-200 text-center"><p class="text-slate-500 font-medium">No contracts defined yet.</p><p class="text-sm text-slate-400 mt-1">Add .ts files to src/contracts/ to see them here.</p></div>'}
+            ${contractLinksHTML || '<div class="bg-white p-10 rounded-2xl border-2 border-dashed border-slate-200 text-center"><p class="text-slate-500 font-medium">No contracts defined yet.</p></div>'}
           </section>
 
-          <!-- Right Column: Team Roster -->
-          <section class="xl:col-span-5">
+          <!-- Bottom Section: Team Roster (Full Width) -->
+          <section>
             <h2 class="text-xl font-bold text-slate-900 mb-6 flex items-center tracking-tight">
-              <svg class="w-5 h-5 mr-2.5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
+              <svg class="w-5 h-5 mr-2.5 text-purple-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path></svg>
               Team Responsibilities
             </h2>
             <div class="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
@@ -177,24 +192,41 @@ async function build() {
               </div>
             </div>
           </section>
+
         </div>
       </div>
 
       <script>
-        function copyUrl(path) {
-          // Grabs exactly 'https://harish3000.github.io/pvh-wip-mock-api' without trailing slashes
-          const baseUrl = window.location.origin + window.location.pathname.replace(/\\/index\\.html$/, '').replace(/\\/$/, '');
-          const fullUrl = baseUrl + path;
-          
+        const getBaseUrl = () => window.location.origin + window.location.pathname.replace(/\\/index\\.html$/, '').replace(/\\/$/, '');
+
+        function showToast(message) {
+          const toast = document.getElementById('toast');
+          document.getElementById('toast-msg').innerText = message;
+          toast.classList.remove('translate-y-20', 'opacity-0');
+          setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+        }
+
+        // Copies the actual code from the TS file
+        async function copyContractCode(path, filename) {
+          try {
+            const res = await fetch(getBaseUrl() + path);
+            if (!res.ok) throw new Error('Network response was not ok');
+            const text = await res.text();
+            await navigator.clipboard.writeText(text);
+            showToast('Code copied: ' + filename);
+          } catch (err) {
+            alert('Failed to fetch and copy contract code.');
+            console.error(err);
+          }
+        }
+
+        // Copies the JSON URL string
+        function copyApiUrl(path, filename) {
+          const fullUrl = getBaseUrl() + path;
           navigator.clipboard.writeText(fullUrl).then(() => {
-            const toast = document.getElementById('toast');
-            const msg = document.getElementById('toast-msg');
-            msg.innerText = 'Copied: ' + path.split('/').pop(); // Show just the filename
-            
-            toast.classList.remove('translate-y-20', 'opacity-0');
-            setTimeout(() => toast.classList.add('translate-y-20', 'opacity-0'), 3000);
+            showToast('URL copied: ' + filename);
           }).catch(err => {
-            alert('Failed to copy: ' + fullUrl);
+            alert('Failed to copy URL');
           });
         }
       </script>
